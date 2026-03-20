@@ -1,2 +1,14 @@
-This Room Allocation System is a Java-based solution designed to automate Use Case 6: Reservation Confirmation & Room Allocation. It utilizes a FIFO (First-In, First-Out) processing model via a Queue to handle booking requests in the exact order they are received. By leveraging Java Collections like HashSet for global uniqueness and HashMap for category tracking, the system ensures that every assigned Room ID is distinct and that no room is ever double-booked, satisfying core business integrity requirements.
-The implementation is split between the RoomAllocationService, which contains the logic for generating sequential IDs (e.g., Single-1, Single-2), and the UseCase6RoomAllocation driver class that orchestrates the flow. When executed, the system immediately updates the Room Inventory and provides clear confirmation logs for each guest. This modular architecture allows for seamless integration into larger hotel management platforms while maintaining a high standard of data accuracy and operational transparency.
+Overview
+This project provides a Java-based solution for managing optional services (such as Spa, Breakfast, or Airport Pickups) associated with confirmed hotel reservations. It allows for the dynamic attachment of multiple services to a single booking ID without impacting room inventory.
+Key Features
+Service Encapsulation: Defines a Service class to store specific service names and their associated costs.
+Centralized Management: Uses an AddOnServiceManager to map unique Reservation IDs to a collection of selected services using a HashMap.
+Cost Calculation: Automatically aggregates the total cost of all add-ons linked to a specific reservation.
+Scalability: Supports adding an unlimited number of services to any confirmed booking.
+Project Structure
+Service: The data model representing an individual add-on.
+AddOnServiceManager: The logic layer that handles storage and cost summation.
+UseCase7AddOnServiceSelection: The entry point that demonstrates the system using sample data (e.g., Reservation "Single-1" with a total cost of 1500.0).
+How to Run
+Compile all classes using a Java compiler (e.g., javac UseCase7AddOnServiceSelection.java).
+Run the main class to view the Selection Summary in the console
