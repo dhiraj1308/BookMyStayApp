@@ -1,13 +1,4 @@
-Hotel Inventory System
-A lightweight Java application demonstrating centralized state management for hotel room availability.
-🏨 Core Logic
-Single Source of Truth: RoomInventory manages availability via a HashMap.
-Decoupled Design: Separates room attributes (price/size) from inventory counts.
-🚀 Usage
-Compile: javac BookMyStayApp.java
-Run: java BookMyStayApp
-📊 Data Snapshot
-Room Type	Beds	Price
-Single	     1	    1500.0
-Double	     2	    2500.0
-Suite	     3	    5000.0
+Project Overview
+The Room Search & Availability Check module is a core component of the BookMyStay application, designed to provide guests with a seamless way to browse available accommodations. By integrating real-time inventory tracking with detailed room descriptions and pricing, the system ensures that users only see options that are currently in stock. This module follows a strict "read-only" architecture, meaning it retrieves and displays information from the central database without risking accidental data modification during the search process.
+Technical Implementation
+From a technical standpoint, the application leverages a decoupled design where room attributes (like pricing and descriptions) are managed separately from their physical availability counts. This is achieved through the RoomSearchService, which queries a dynamic RoomInventory map to validate stock levels before presenting details to the user via the Room objects. This approach not only ensures data integrity but also provides a scalable foundation for adding more complex features in the future, such as date-range filtering or amenity-based sorting.
