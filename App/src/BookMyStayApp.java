@@ -2,109 +2,136 @@ import java.util.*;
 
 /**
  * ===========================================================================
- * MAIN CLASS - UseCase10BookingCancellation
+ * MAIN CLASS - UseCase11ThreadSafety
  * ===========================================================================
  *
- * Use Case 10: Booking Cancellation & Inventory Rollback
+ * Use Case 11: Concurrent Booking Simulation
  *
- * Description:
- * This class demonstrates how confirmed bookings can be cancelled safely.
- * Inventory is restored and rollback history is maintained using a Stack.
- *
- * @version 10.0
+ * This implementation demonstrates how to handle multiple guest requests
+ * simultaneously without corrupting the room inventory.
  */
 
-// Supporting Class: Simulates the Inventory Management from previous cases
+// 1. SHARED RESOURCE: The Room Inventory
 class RoomInventory {
-    private Map<String, Integer> counts = new HashMap<>();
-
-    public RoomInventory() {
-        counts.put("Deluxe", 5);
-        counts.put("Suite", 2);
-    }
-
-    public void updateInventory(String type, int change) {
-        counts.put(type, counts.getOrDefault(type, 0) + change);
-        System.out.println("Inventory Update: " + type + " is now " + counts.get(type));
-    }
-}
-
-// Core Logic: The Cancellation Service
-class CancellationService {
-    private Stack<String> releasedRoomIds = new Stack<>(); // LIFO Rollback structure
-    private Map<String, String> activeBookings = new HashMap<>(); // Tracks Reservation -> RoomType
-
-    public void addBooking(String resId, String roomType) {
-        activeBookings.put(resId, roomType);
-    }
-
-    public void cancelBooking(String resId, RoomInventory inventory) {
-        System.out.println("\n--- Processing Cancellation: " + resId + " ---");
-
-        // 1. Validation: Verify reservation existence before rollback
-        if (!activeBookings.containsKey(resId)) {
-            System.err.println("Failure: Cancellation rejected. Reservation " + resId + " not found.");
-            return;
-        }
-
-        // 2. Identify and record the state for rollback
-        String roomType = activeBookings.get(resId);
-        releasedRoomIds.push(resId); // LIFO Rollback Logic
-
-        // 3. Inventory Restoration: Increment count immediately
-        inventory.updateInventory(roomType, 1);
-
-        // 4. Controlled Mutation: Update history and remove from active records
-        activeBookings.remove(resId);
-
-        System.out.println("Success: System state restored consistently for " + resId);
-    }
-
-    public void showRollbackHistory() {
-        System.out.println("\n--- Current Rollback History (LIFO) ---");
-        if (releasedRoomIds.isEmpty()) {
-            System.out.println("No cancellations recorded.");
-        } else {
-            // Stack displays most recent cancellation at the top
-            for (int i = releasedRoomIds.size() - 1; i >= 0; i--) {
-                System.out.println("Rollback Point [" + (releasedRoomIds.size() - i) + "]: " + releasedRoomIds.get(i));
-            }
-        }
-    }
-}
-
-public class BookMyStayApp {
+    // Shared mutable state: Only 2 rooms available for this simulation
+    private int deluxeRooms = 2;
 
     /**
-     * Application entry point.
-     *
-     * @param args Command-line arguments
+     * Critical Section: The 'synchronized' keyword ensures that only one
+     * thread can execute this method at a time, preventing Race Conditions.
      */
+    public synchronized boolean allocateRoom(String guestName) {
+        if (deluxeRooms > 0) {
+            System.out.println("[SYSTEM] " + Thread.currentThread().getName() + " found availability for: " + guestName);
+
+            // Simulate brief processing time to emphasize concurrent behavior
+            try { Thread.sleep(100); } catch (InterruptedException e) {}
+
+            deluxeRooms--; // Decrement shared state safely
+            return true;
+        }
+        return false; // No rooms left
+    }
+
+    public int getRemainingCount() { return deluxeRooms; }
+}
+
+// 2. SHARED RESOURCE: The Booking Queue
+class BookingRequestQueue {
+    private final Queue<String> queue = new LinkedList<>();
+
+    // Add requests to the shared queue
+    public synchronized void addRequest(String guestName) {
+        queue.add(guestName);
+    }
+
+    // Thread-safe method to retrieve the next guest in line
+    public synchronized String getNextRequest() {
+        return queue.poll();
+    }
+}
+
+// 3. SERVICE: The Allocation Logic
+class AllocationService {
+    public void process(String guest, RoomInventory inventory) {
+        if (inventory.allocateRoom(guest)) {
+            System.out.println("✅ SUCCESS: Room allocated to " + guest);
+        } else {
+            System.out.println("❌ FAILED: No rooms left for " + guest);
+        }
+    }
+}
+
+// 4. THE THREADED PROCESSOR (Runnable Task)
+class ConcurrentBookingProcessor implements Runnable {
+    private BookingRequestQueue bookingQueue;
+    private RoomInventory inventory;
+    private AllocationService allocationService;
+
+    public ConcurrentBookingProcessor(BookingRequestQueue bq, RoomInventory inv, AllocationService as) {
+        this.bookingQueue = bq;
+        this.inventory = inv;
+        this.allocationService = as;
+    }
+
+    @Override
+    public void run() {
+        String guest;
+        // Keep processing while there are guests in the shared queue
+        while ((guest = bookingQueue.getNextRequest()) != null) {
+            allocationService.process(guest, inventory);
+        }
+    }
+}
+
+// 5. APPLICATION ENTRY POINT
+public class BookMyStayApp {
     public static void main(String[] args) {
-        // Initialize System Components
+        System.out.println("--- Starting Concurrent Booking Simulation (2 Rooms Available) ---");
+
+        // Step 1: Initialize shared resources
         RoomInventory inventory = new RoomInventory();
-        CancellationService cancellationService = new CancellationService();
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
+        AllocationService allocationService = new AllocationService();
 
-        // Setup: Create some confirmed bookings
-        System.out.println("Initial Setup: Registering Bookings...");
-        cancellationService.addBooking("RES-001", "Deluxe");
-        cancellationService.addBooking("RES-002", "Suite");
-        cancellationService.addBooking("RES-003", "Deluxe");
+        // Step 2: Populate the queue with 5 concurrent guest requests
+        String[] guests = {"Alice", "Bob", "Charlie", "David", "Eve"};
+        for (String guest : guests) {
+            bookingQueue.addRequest(guest);
+        }
 
-        // --- Flow: Guest initiates cancellation requests ---
+        // --- START OF CODE FROM SNAPSHOT ---
 
-        // 1. Valid Cancellation
-        cancellationService.cancelBooking("RES-003", inventory);
+        // Create booking processor tasks (Worker Threads)
+        Thread t1 = new Thread(
+                new ConcurrentBookingProcessor(
+                        bookingQueue, inventory, allocationService
+                ), "Processor-Thread-1"
+        );
 
-        // 2. Another Valid Cancellation (Models LIFO behavior)
-        cancellationService.cancelBooking("RES-001", inventory);
+        Thread t2 = new Thread(
+                new ConcurrentBookingProcessor(
+                        bookingQueue, inventory, allocationService
+                ), "Processor-Thread-2"
+        );
 
-        // 3. Invalid Cancellation (Safety check)
-        cancellationService.cancelBooking("RES-999", inventory);
+        // Start concurrent processing
+        t1.start();
+        t2.start();
 
-        // --- Final State Review ---
-        cancellationService.showRollbackHistory();
+        try {
+            // Main thread waits for both workers to finish before proceeding
+            t1.join();
+            t2.join();
+        } catch (InterruptedException e) {
+            System.out.println("Thread execution interrupted.");
+        }
 
-        System.out.println("\n--- System remains stable and consistent ---");
+        // --- END OF CODE FROM SNAPSHOT ---
+
+        // Final State Review
+        System.out.println("\n--- Final System State ---");
+        System.out.println("Remaining Rooms: " + inventory.getRemainingCount());
+        System.out.println("Simulation complete. No double-bookings occurred.");
     }
 }
