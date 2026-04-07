@@ -1,71 +1,80 @@
-import java.util.HashMap;
-import java.util.Map;
+/**
+ * =====================================================================
+ * PROJECT: Hotel Booking System - Use Case 8
+ * =====================================================================
+ * This program implements the "Booking History and Reporting"
+ * requirements shown in the documentation image.
+ *
+ * CORE FEATURES:
+ * 1. Ordered Storage: Maintains the sequence of confirmed bookings.
+ * 2. Formatted Output: Generates a human-readable summary report.
+ * 3. Separation of Concerns: Uses a dedicated class for booking records.
+ */
 
-// 1. Removed 'public' so it can stay in this file
-class Room {
-    private String type;
-    private double price;
+import java.util.ArrayList;
+import java.util.List;
 
-    public Room(String type, double price) {
-        this.type = type;
-        this.price = price;
+/**
+ * Represents a single confirmed reservation record.
+ */
+class BookingRecord {
+    // Fields to store guest details and room selection
+    private String guestName;
+    private String roomType;
+
+    /**
+     * Constructor to initialize a new booking record.
+     * @param guestName The name of the guest
+     * @param roomType The category of room (Single, Double, Suite)
+     */
+    public BookingRecord(String guestName, String roomType) {
+        this.guestName = guestName;
+        this.roomType = roomType;
     }
 
-    public String getRoomType() { return type; }
-    public double getRoomPrice() { return price; }
-}
-
-// 2. Removed 'public'
-class RoomInventory {
-    private Map<String, Integer> inventory = new HashMap<>();
-
-    public void updateAvailability(String type, int count) {
-        inventory.put(type, count);
-    }
-
-    public Map<String, Integer> getRoomAvailability() {
-        return inventory;
-    }
-}
-
-// 3. Removed 'public'
-class RoomSearchService {
-    public void searchAvailableRooms(RoomInventory inventory, Room singleRoom, Room doubleRoom, Room suiteRoom) {
-        Map<String, Integer> availability = inventory.getRoomAvailability();
-        System.out.println("=== Available Rooms ===");
-
-        if (availability.getOrDefault("Single", 0) > 0) {
-            displayRoom(singleRoom, availability.get("Single"));
-        }
-        if (availability.getOrDefault("Double", 0) > 0) {
-            displayRoom(doubleRoom, availability.get("Double"));
-        }
-        if (availability.getOrDefault("Suite", 0) > 0) {
-            displayRoom(suiteRoom, availability.get("Suite"));
-        }
-    }
-
-    private void displayRoom(Room room, int count) {
-        System.out.println("Type: " + room.getRoomType() + " | Price: $" + room.getRoomPrice() + " | Available: " + count);
+    /**
+     * Overriding toString to match the exact report format in the image:
+     * "Guest: [Name], Room Type: [Type]"
+     */
+    @Override
+    public String toString() {
+        return "Guest: " + guestName + ", Room Type: " + roomType;
     }
 }
 
-// 4. This class is PUBLIC because it matches the filename 'BookMyStayApp.java'
+/**
+ * Main application class to manage and report booking history.
+ */
 public class BookMyStayApp {
+
+    /**
+     * Entry point of the application.
+     */
     public static void main(String[] args) {
-        // Setup Room Definitions
-        Room single = new Room("Single Standard", 188.55);
-        Room doubleR = new Room("Double Deluxe", 158.01);
-        Room suite = new Room("Executive Suite", 300.01);
 
-        // Setup Inventory
-        RoomInventory inventory = new RoomInventory();
-        inventory.updateAvailability("Single", 5);
-        inventory.updateAvailability("Double", 2);
-        inventory.updateAvailability("Suite", 0);
+        // --- 1. DATA COLLECTION PHASE ---
+        // Using an ArrayList to maintain the "Audit Trail" (chronological order)
+        List<BookingRecord> history = new ArrayList<>();
 
-        // Execute Search
-        RoomSearchService service = new RoomSearchService();
-        service.searchAvailableRooms(inventory, single, doubleR, suite);
+        // Adding the specific data points from the image
+        history.add(new BookingRecord("Abhi", "Single"));
+        history.add(new BookingRecord("Subha", "Double"));
+        history.add(new BookingRecord("Vanmathi", "Suite"));
+
+        // --- 2. REPORT GENERATION PHASE ---
+        // Printing the primary system header
+        System.out.println("Booking History and Reporting");
+
+        // Printing a line break for visual clarity as seen in the layout
+        System.out.println();
+
+        // Printing the specific report title
+        System.out.println("Booking History Report");
+
+        // --- 3. OUTPUT PHASE ---
+        // Iterating through the history list to display each record
+        for (BookingRecord record : history) {
+            System.out.println(record);
+        }
     }
 }

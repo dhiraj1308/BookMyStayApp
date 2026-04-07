@@ -1,4 +1,37 @@
-Project Overview
-The Room Search & Availability Check module is a core component of the BookMyStay application, designed to provide guests with a seamless way to browse available accommodations. By integrating real-time inventory tracking with detailed room descriptions and pricing, the system ensures that users only see options that are currently in stock. This module follows a strict "read-only" architecture, meaning it retrieves and displays information from the central database without risking accidental data modification during the search process.
-Technical Implementation
-From a technical standpoint, the application leverages a decoupled design where room attributes (like pricing and descriptions) are managed separately from their physical availability counts. This is achieved through the RoomSearchService, which queries a dynamic RoomInventory map to validate stock levels before presenting details to the user via the Room objects. This approach not only ensures data integrity but also provides a scalable foundation for adding more complex features in the future, such as date-range filtering or amenity-based sorting.
+## Booking History and Reporting System (Use Case 8)
+This project implements a simple Java-based reporting module for a hotel management system. It captures guest names and their selected room types, storing them in a chronological audit trail to generate a formatted history report.
+------------------------------
+## 📋 Features
+
+* Ordered Storage: Uses ArrayList to ensure bookings are displayed in the exact order they were checked in.
+* Formatted Reporting: Generates a clean, human-readable summary matching the specified documentation format.
+* Object-Oriented Design: Separates the data structure (BookingRecord) from the reporting logic (BookingHistoryManager).
+
+## 🛠️ Implementation Details
+The system is built using Java 8+ and focuses on three core areas:
+
+1. Data Capture: Initializing guest records (e.g., Abhi, Subha, Vanmathi).
+2. Audit Trail: Maintaining a sequential list of all confirmed transactions.
+3. Report Generation: Outputting a titled report with specific formatting: Guest: [Name], Room Type: [Type].
+
+## 🚀 How to Run
+
+1. Compile the code:
+
+javac BookingHistoryManager.java
+
+2. Execute the program:
+
+java BookingHistoryManager
+
+
+## 📄 Sample Output
+
+Booking History and Reporting
+
+Booking History Report
+Guest: Abhi, Room Type: Single
+Guest: Subha, Room Type: Double
+Guest: Vanmathi, Room Type: Suite
+
+
