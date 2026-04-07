@@ -1,137 +1,128 @@
+import java.io.*;
 import java.util.*;
 
 /**
  * ===========================================================================
- * MAIN CLASS - UseCase11ThreadSafety
+ * MAIN CLASS - UseCase12DataPersistenceRecovery
  * ===========================================================================
  *
- * Use Case 11: Concurrent Booking Simulation
+ * Use Case 12: Data Persistence & System Recovery
  *
- * This implementation demonstrates how to handle multiple guest requests
- * simultaneously without corrupting the room inventory.
+ * Description:
+ * This class demonstrates how system state
+ * can be restored after an application restart.
+ *
+ * Inventory data is loaded from a file
+ * before any booking operations occur.
+ *
+ * @version 12.0
  */
+public class BookMyStayApp {
 
-// 1. SHARED RESOURCE: The Room Inventory
-class RoomInventory {
-    // Shared mutable state: Only 2 rooms available for this simulation
-    private int deluxeRooms = 2;
+    private static final String DATA_FILE = "inventory_state.txt";
 
     /**
-     * Critical Section: The 'synchronized' keyword ensures that only one
-     * thread can execute this method at a time, preventing Race Conditions.
+     * Application entry point.
+     *
+     * @param args Command-line arguments
      */
-    public synchronized boolean allocateRoom(String guestName) {
-        if (deluxeRooms > 0) {
-            System.out.println("[SYSTEM] " + Thread.currentThread().getName() + " found availability for: " + guestName);
-
-            // Simulate brief processing time to emphasize concurrent behavior
-            try { Thread.sleep(100); } catch (InterruptedException e) {}
-
-            deluxeRooms--; // Decrement shared state safely
-            return true;
-        }
-        return false; // No rooms left
-    }
-
-    public int getRemainingCount() { return deluxeRooms; }
-}
-
-// 2. SHARED RESOURCE: The Booking Queue
-class BookingRequestQueue {
-    private final Queue<String> queue = new LinkedList<>();
-
-    // Add requests to the shared queue
-    public synchronized void addRequest(String guestName) {
-        queue.add(guestName);
-    }
-
-    // Thread-safe method to retrieve the next guest in line
-    public synchronized String getNextRequest() {
-        return queue.poll();
-    }
-}
-
-// 3. SERVICE: The Allocation Logic
-class AllocationService {
-    public void process(String guest, RoomInventory inventory) {
-        if (inventory.allocateRoom(guest)) {
-            System.out.println("✅ SUCCESS: Room allocated to " + guest);
-        } else {
-            System.out.println("❌ FAILED: No rooms left for " + guest);
-        }
-    }
-}
-
-// 4. THE THREADED PROCESSOR (Runnable Task)
-class ConcurrentBookingProcessor implements Runnable {
-    private BookingRequestQueue bookingQueue;
-    private RoomInventory inventory;
-    private AllocationService allocationService;
-
-    public ConcurrentBookingProcessor(BookingRequestQueue bq, RoomInventory inv, AllocationService as) {
-        this.bookingQueue = bq;
-        this.inventory = inv;
-        this.allocationService = as;
-    }
-
-    @Override
-    public void run() {
-        String guest;
-        // Keep processing while there are guests in the shared queue
-        while ((guest = bookingQueue.getNextRequest()) != null) {
-            allocationService.process(guest, inventory);
-        }
-    }
-}
-
-// 5. APPLICATION ENTRY POINT
-public class BookMyStayApp {
     public static void main(String[] args) {
-        System.out.println("--- Starting Concurrent Booking Simulation (2 Rooms Available) ---");
+        System.out.println("--- System Initializing ---");
 
-        // Step 1: Initialize shared resources
+        // 1. Initialize System State
         RoomInventory inventory = new RoomInventory();
-        BookingRequestQueue bookingQueue = new BookingRequestQueue();
-        AllocationService allocationService = new AllocationService();
+        PersistenceService persistence = new PersistenceService();
 
-        // Step 2: Populate the queue with 5 concurrent guest requests
-        String[] guests = {"Alice", "Bob", "Charlie", "David", "Eve"};
-        for (String guest : guests) {
-            bookingQueue.addRequest(guest);
+        // 2. System Startup Flow: Restore state from persistent storage
+        // This transitions the app from in-memory only to a durable system.
+        persistence.loadState(inventory, DATA_FILE);
+
+        // 3. Display current state after recovery
+        System.out.println("Current Inventory after recovery:");
+        inventory.display();
+
+        // 4. Simulate booking operation (Modify state)
+        System.out.println("\nProcessing a new booking...");
+        inventory.updateRoomCount("Deluxe", -1);
+
+        // 5. System Shutdown Flow: Save current state to file
+        // Ensures that critical data survives until the next restart.
+        persistence.saveState(inventory, DATA_FILE);
+
+        System.out.println("\n--- System Shutdown Complete ---");
+    }
+}
+
+/**
+ * Persistence Service handles the serialization and deserialization
+ * of system data to a physical file.
+ */
+class PersistenceService {
+
+    /**
+     * Saves the inventory state to a file.
+     * Uses Serialization concepts by converting Map data to text lines.
+     */
+    public void saveState(RoomInventory inventory, String filePath) {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(filePath))) {
+            for (Map.Entry<String, Integer> entry : inventory.getRooms().entrySet()) {
+                writer.write(entry.getKey() + ":" + entry.getValue());
+                writer.newLine();
+            }
+            System.out.println("Success: System state persisted to " + filePath);
+        } catch (IOException e) {
+            System.err.println("Error: Failed to save system state. " + e.getMessage());
+        }
+    }
+
+    /**
+     * Loads the inventory state from a file.
+     * Implements Failure Tolerance by checking if file exists.
+     */
+    public void loadState(RoomInventory inventory, String filePath) {
+        File file = new File(filePath);
+        if (!file.exists()) {
+            System.out.println("Notice: No persistence file found. Starting with default inventory.");
+            inventory.initializeDefault();
+            return;
         }
 
-        // --- START OF CODE FROM SNAPSHOT ---
-
-        // Create booking processor tasks (Worker Threads)
-        Thread t1 = new Thread(
-                new ConcurrentBookingProcessor(
-                        bookingQueue, inventory, allocationService
-                ), "Processor-Thread-1"
-        );
-
-        Thread t2 = new Thread(
-                new ConcurrentBookingProcessor(
-                        bookingQueue, inventory, allocationService
-                ), "Processor-Thread-2"
-        );
-
-        // Start concurrent processing
-        t1.start();
-        t2.start();
-
-        try {
-            // Main thread waits for both workers to finish before proceeding
-            t1.join();
-            t2.join();
-        } catch (InterruptedException e) {
-            System.out.println("Thread execution interrupted.");
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                String[] parts = line.split(":");
+                if (parts.length == 2) {
+                    inventory.setRoomCount(parts[0], Integer.parseInt(parts[1]));
+                }
+            }
+            System.out.println("Success: System state restored from " + filePath);
+        } catch (IOException | NumberFormatException e) {
+            System.err.println("Warning: Could not recover state. Starting fresh. " + e.getMessage());
+            inventory.initializeDefault();
         }
+    }
+}
 
-        // --- END OF CODE FROM SNAPSHOT ---
+/**
+ * Represents the in-memory Room Inventory.
+ */
+class RoomInventory {
+    private Map<String, Integer> rooms = new HashMap<>();
 
-        // Final State Review
-        System.out.println("\n--- Final System State ---");
-        System.out.println("Remaining Rooms: " + inventory.getRemainingCount());
-        System.out.println("Simulation complete. No double-bookings occurred.");
+    public void initializeDefault() {
+        rooms.put("Deluxe", 10);
+        rooms.put("Suite", 5);
+    }
+
+    public void setRoomCount(String type, int count) { rooms.put(type, count); }
+
+    public void updateRoomCount(String type, int change) {
+        rooms.put(type, rooms.getOrDefault(type, 0) + change);
+    }
+
+    public Map<String, Integer> getRooms() { return rooms; }
+
+    public void display() {
+        rooms.forEach((type, count) -> System.out.println(" - " + type + ": " + count));
     }
 }
