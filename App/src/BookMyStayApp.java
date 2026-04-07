@@ -1,137 +1,118 @@
-import java.util.ArrayList;
+import java.util.Scanner;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
- * =====================================================================
- * CLASS - Service
- * =====================================================================
- *
- * Use Case 7: Add-On Service Selection
- *
- * Description:
- * This class represents an optional service
- * that can be added to a confirmed reservation.
- *
- * @version 7.0
+ * ===========================================================================
+ * USE CASE 9: ERROR HANDLING & VALIDATION
+ * ===========================================================================
+ * This code demonstrates:
+ * 1. Fail-Fast Design (Detecting errors early)
+ * 2. Guarding System State (Preventing invalid inventory changes)
+ * 3. Custom Exceptions (Clear, domain-specific error reporting)
  */
-class Service {
-    /** Name of the service. */
-    private String serviceName;
 
-    /** Cost of the service. */
-    private double cost;
-
-    /**
-     * Creates a new add-on service.
-     *
-     * @param serviceName name of the service
-     * @param cost cost of the service
-     */
-    public Service(String serviceName, double cost) {
-        this.serviceName = serviceName;
-        this.cost = cost;
-    }
-
-    /** @return service name */
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    /** @return service cost */
-    public double getCost() {
-        return cost;
+// 1. CUSTOM EXCEPTION: Represents domain-specific booking errors
+class InvalidBookingException extends Exception {
+    public InvalidBookingException(String message) {
+        super(message);
     }
 }
 
-/**
- * =====================================================================
- * CLASS - AddOnServiceManager
- * =====================================================================
- *
- * Description:
- * This class manages optional services associated with confirmed reservations.
- *
- * @version 7.0
- */
-class AddOnServiceManager {
-    /**
-     * Maps reservation ID to selected services.
-     * Key -> Reservation ID
-     * Value -> List of selected services
-     */
-    private Map<String, List<Service>> servicesByReservation;
+// 2. ROOM INVENTORY: Stores current state of rooms
+class RoomInventory {
+    private Map<String, Integer> inventory = new HashMap<>();
 
-    /** Initializes the service manager. */
-    public AddOnServiceManager() {
-        servicesByReservation = new HashMap<>();
+    public RoomInventory() {
+        // Initial setup: 2 Deluxe rooms, 0 Suites (to test "No Availability")
+        inventory.put("Deluxe", 2);
+        inventory.put("Suite", 0);
     }
 
-    /**
-     * Attaches a service to a reservation.
-     *
-     * @param reservationId confirmed reservation ID
-     * @param service add-on service
-     */
-    public void addService(String reservationId, Service service) {
-        servicesByReservation.computeIfAbsent(reservationId, k -> new ArrayList<>());
-        servicesByReservation.get(reservationId).add(service);
+    public boolean isValidRoomType(String type) {
+        return inventory.containsKey(type);
     }
 
-    /**
-     * Calculates total add-on cost for a reservation.
-     *
-     * @param reservationId reservation ID
-     * @return total service cost
-     */
-    public double calculateTotalServiceCost(String reservationId) {
-        List<Service> services = servicesByReservation.get(reservationId);
-        if (services == null) return 0.0;
+    public int getAvailableCount(String type) {
+        return inventory.getOrDefault(type, 0);
+    }
+}
 
-        double total = 0.0;
-        for (Service s : services) {
-            total += s.getCost();
+// 3. BOOKING QUEUE: Handles successful requests
+class BookingRequestQueue {
+    public void addRequest(String guest, String room) {
+        System.out.println("Processing... [Queueing request for " + guest + " in " + room + "]");
+    }
+}
+
+// 4. RESERVATION VALIDATOR: The "Guard" that prevents invalid states
+class ReservationValidator {
+    public void validate(String guestName, String roomType, RoomInventory inventory)
+            throws InvalidBookingException {
+
+        // Check for empty inputs (Input Validation)
+        if (guestName == null || guestName.trim().isEmpty()) {
+            throw new InvalidBookingException("Guest name cannot be empty.");
         }
-        return total;
+
+        // Check if the room type even exists (System Constraints)
+        if (!inventory.isValidRoomType(roomType)) {
+            throw new InvalidBookingException("Invalid room type: " + roomType);
+        }
+
+        // Check for availability (Guarding System State)
+        if (inventory.getAvailableCount(roomType) <= 0) {
+            throw new InvalidBookingException("No availability for room type: " + roomType);
+        }
+
+        // If logic reaches here, state is valid!
     }
 }
 
-/**
- * =====================================================================
- * MAIN CLASS - UseCase7AddOnServiceSelection
- * =====================================================================
- *
- * Description:
- * This class demonstrates how optional services can be attached
- * to a confirmed booking.
- *
- * @version 7.0
- */
+// 5. MAIN APPLICATION CLASS
 public class BookMyStayApp {
 
-    /**
-     * Application entry point.
-     *
-     * @param args Command-line arguments
-     */
     public static void main(String[] args) {
-        // Initialize manager
-        AddOnServiceManager manager = new AddOnServiceManager();
+        // Display application header
+        System.out.println("--- Hotel Booking Validation System ---");
 
-        // Target Reservation ID from requirements
-        String resId = "Single-1";
+        Scanner scanner = new Scanner(System.in);
 
-        // Adding services that sum up to 1500.0
-        manager.addService(resId, new Service("Spa", 1000.0));
-        manager.addService(resId, new Service("Breakfast", 500.0));
+        // Initialize required components
+        RoomInventory inventory = new RoomInventory();
+        ReservationValidator validator = new ReservationValidator();
+        BookingRequestQueue bookingQueue = new BookingRequestQueue();
 
-        // Calculate total
-        double totalCost = manager.calculateTotalServiceCost(resId);
+        try {
+            // Collect input from the Guest (Actor)
+            System.out.print("Enter Guest Name: ");
+            String guestName = scanner.nextLine();
 
-        // Print final output
-        System.out.println("Add-On Service Selection");
-        System.out.println("Reservation ID: " + resId);
-        System.out.println("Total Add-On Cost: " + totalCost);
+            System.out.print("Enter Room Type (Deluxe/Suite): ");
+            String roomType = scanner.nextLine();
+
+            // STEP 1: Structured Validation (Fail-Fast Design)
+            // The validator throws an exception if ANYTHING is wrong.
+            validator.validate(guestName, roomType, inventory);
+
+            // STEP 2: Logic processing (Only occurs if validation passes)
+            bookingQueue.addRequest(guestName, roomType);
+            System.out.println("SUCCESS: Your booking has been processed safely.");
+
+        } catch (InvalidBookingException e) {
+            // STEP 3: Handle domain-specific validation errors (Graceful Failure)
+            // Instead of crashing, we show a meaningful failure message.
+            System.out.println("\n[!] BOOKING FAILED: " + e.getMessage());
+            System.out.println("Status: The system prevented an invalid state change.");
+
+        } catch (Exception e) {
+            // Catch-all for any unexpected system errors
+            System.out.println("Unexpected Error: " + e.getMessage());
+
+        } finally {
+            // STEP 4: Cleanup resources
+            scanner.close();
+            System.out.println("--- Session Closed ---");
+        }
     }
 }
